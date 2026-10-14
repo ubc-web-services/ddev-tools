@@ -1,7 +1,7 @@
 #!/bin/bash
 #ddev-generated
 
-## Description: create a custom theme and install recipes, settings, export configuration
+## Description: install recipes, settings, export configuration
 ## Usage: quickstart
 ## Example: ddev quickstart
 
@@ -12,23 +12,10 @@ vendor/bin/drush site:install --site-mail=no-reply.webservices@ubc.ca --account-
 echo -e "Please enter the site name: "
 read sitename
 
-# setup themename
-echo -e "Please enter a machine name for your new theme (lowercase and underscores only): "
-read themename
-
+# Run the main orchestration recipe
 cd ${DDEV_DOCROOT}
 
-# Create a new theme
-php ../vendor/bin/dr generate-theme "$themename"  --starterkit kraken --path themes/custom
-
-# Run the main orchestration recipe
-php ../vendor/bin/dr recipe ../recipes/ws-recipes -v
-
-# Run the ckeditor bookmark recipe
-php ../vendor/bin/dr recipe ../recipes/ws-recipes/ws-utility/utility-add-bookmark-button -v
-
-# Run the ckeditor findreplace recipe
-php ../vendor/bin/dr recipe ../recipes/ws-recipes/ws-utility/utility-add-findreplace-button -v
+php core/scripts/drupal recipe ../recipes/ws-recipes/ws-sci/ -v
 
 # Enable devel
 drush pm:enable devel
@@ -37,13 +24,33 @@ drush pm:enable devel
 drush config-set system.site name "$sitename" -y
 
 # Set the site name in the kraken theme
-drush config-set kraken.settings clf_unitname "$sitename" -y
+drush config-set science.settings clf_unitname "$sitename" -y
 
 # Set media_alias_display settings
 drush config-set media_alias_display.settings media_bundles.audio audio -y
 drush config-set media_alias_display.settings media_bundles.file file -y
 drush config-set media_alias_display.settings media_bundles.image image -y
 drush config-set media_alias_display.settings media_bundles.svg_icon svg_icon -y
+
+# Set ubc_ckeditor_widgets settings
+drush config-set ubc_ckeditor_widgets.settings primary_color '#0055B7' -y
+drush config-set ubc_ckeditor_widgets.settings secondary_color '#6EC4E8' -y
+drush config-set ubc_ckeditor_widgets.settings tertiary_color '#BEE6F4' -y
+drush config-set ubc_ckeditor_widgets.settings accent_color '#00ACCE' -y
+
+# Remove unused keys from hidden config form modes (https://git.drupalcode.org/project/distributions_recipes/-/blob/1.0.x/docs/config_action_list.md#hidecomponents doesn't currently work)
+## Homepage form mode
+drush config:delete core.entity_form_display.node.homepage.default content.field_feature_link
+drush config:delete core.entity_form_display.node.homepage.default content.field_feature_text
+drush config:delete core.entity_form_display.node.homepage.default content.field_home_feature_image
+## Homepage featured_content display
+drush config:delete core.entity_view_display.node.homepage.featured_content content.field_feature_link
+drush config:delete core.entity_view_display.node.homepage.featured_content content.field_feature_text
+drush config:delete core.entity_view_display.node.homepage.featured_content content.field_home_feature_image
+## Landing Page featured_content display
+drush config:delete core.entity_view_display.node.ubc_landing_page.featured_content content.field_landing_feature_image
+## Profile form mode
+drush config:delete core.entity_form_display.node.ubc_profile.default content.field_profile_office
 
 # Remove unused role
 drush config:delete "user.role.content_editor"
@@ -60,7 +67,7 @@ drush config:delete "system.action.user_remove_role_action.content_editor"
 # drush eval "\Drupal::entityTypeManager()->getStorage('comment_type')->load('comment')->delete();"
 
 # Disable comment and announcement modules
-# drush pmu comment - removed as 11.4 no longer installs these by default
+# drush pmu comment - removed as 11.4 no longer installs this by default
 drush pmu announcements_feed navigation layout_builder layout_discovery
 
 # Rebuild Permissions
@@ -71,12 +78,6 @@ drush updb -y
 
 # Enable the update module
 drush pm:install update -y
-
-# Set the custom theme as the default theme
-drush theme:enable "$themename" -y
-drush config-set system.theme default "$themename" -y
-drush config-set "$themename".settings clf_unitname "$sitename" -y
-# drush theme:uninstall kraken -y
 
 # Export the config
 drush cex -y
