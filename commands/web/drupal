@@ -1,0 +1,10 @@
+#!/bin/bash
+#ddev-generated
+
+## Description: run the Drupal core script with provided arguments
+## Usage: drupal <arguments>
+## Example: ddev drupal recipe recipes/drupal-base
+
+cd ${DDEV_DOCROOT}
+
+php ../vendor/bin/dr "$@"

@@ -1,6 +1,10 @@
 name: tools
 
 project_files:
-  - docker-compose.tools.yaml
+  - commands/web/d11prepare
+  - commands/web/drupal
+  - commands/web/quickstart
+  - commands/web/robots
+  - commands/web/theme
 
 ddev_version_constraint: '>= v1.24.10'
