@@ -3,7 +3,6 @@ name: tools
 project_files:
   - commands/web/d11prepare
   - commands/web/drupal
-  - commands/web/quickstart
   - commands/web/robots
   - commands/web/theme
 
