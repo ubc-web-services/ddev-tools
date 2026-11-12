@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#
+#ddev-generated
 # Prepare a Drupal / Platform.sh project for PHP 8.4.
 # Run from the project root. Requires: composer, yq (mikefarah v4+).
 
