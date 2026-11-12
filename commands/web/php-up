@@ -2,7 +2,12 @@
 #
 # Prepare a Drupal / Platform.sh project for PHP 8.4.
 # Run from the project root. Requires: composer, yq (mikefarah v4+).
-#
+
+## Description: update WS Drupal projects PHP php 8.3 -> PHP 8.4
+## Usage: php-up
+## Example: ddev php-up
+
+
 set -euo pipefail
 
 DDEV_CONFIG=".ddev/config.yaml"
