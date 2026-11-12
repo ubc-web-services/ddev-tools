@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+#
+# Prepare a Drupal / Platform.sh project for PHP 8.4.
+# Run from the project root. Requires: composer, yq (mikefarah v4+).
+#
+set -euo pipefail
+
+DDEV_CONFIG=".ddev/config.yaml"
+PLATFORM_APP=".platform.app.yaml"
+
+# --- Preflight ---------------------------------------------------------------
+[[ -f composer.json ]] || { echo "Error: composer.json not found. Run this from the project root." >&2; exit 1; }
+[[ -f "$DDEV_CONFIG" ]] || { echo "Error: $DDEV_CONFIG not found." >&2; exit 1; }
+[[ -f "$PLATFORM_APP" ]] || { echo "Error: $PLATFORM_APP not found." >&2; exit 1; }
+
+command -v composer >/dev/null 2>&1 || { echo "Error: composer is not installed." >&2; exit 1; }
+if ! command -v yq >/dev/null 2>&1 || ! yq --version 2>&1 | grep -qi 'mikefarah'; then
+  echo "Error: mikefarah/yq (v4+) is required. See https://github.com/mikefarah/yq" >&2
+  exit 1
+fi
+
+# --- 1. Composer packages ----------------------------------------------------
+echo "==> Requiring Composer packages"
+composer require \
+  composer/installers:^2.0 \
+  drush/drush \
+  platformsh/config-reader:^3.0
+
+# --- 2. DDEV PHP version -----------------------------------------------------
+echo "==> Setting php_version to 8.4 in $DDEV_CONFIG"
+yq -i '.php_version = "8.4"' "$DDEV_CONFIG"
+
+# --- 3. Platform.sh PHP type -------------------------------------------------
+echo "==> Setting type to php:8.4 in $PLATFORM_APP"
+yq -i '.type = "php:8.4"' "$PLATFORM_APP"
+
+# --- 4. nodejs dependency (n) ------------------------------------------------
+echo "==> Adding nodejs/n dependency"
+yq -i '.dependencies.nodejs.n = "*"' "$PLATFORM_APP"
+
+# --- 5. N_PREFIX environment variable ----------------------------------------
+echo "==> Adding N_PREFIX to variables.env"
+if [[ "$(yq 'has("variables")' "$PLATFORM_APP")" != "true" ]]; then
+  # No variables key yet: insert it as the top-level key directly after the
+  # dependencies block (or at the end of the file if dependencies is last).
+  tmp="$(mktemp)"
+  awk '
+    function emit() {
+      print "variables:"
+      print "  env:"
+      print "    N_PREFIX: \"/app/.global\""
+    }
+    /^dependencies:/ { in_dep = 1; print; next }
+    in_dep && /^[^[:space:]]/ { emit(); print ""; in_dep = 0; done = 1 }
+    { print }
+    END { if (in_dep && !done) { print ""; emit() } }
+  ' "$PLATFORM_APP" > "$tmp" && mv "$tmp" "$PLATFORM_APP"
+fi
+# Sets the value (and creates variables.env if variables already existed without it).
+yq -i '.variables.env.N_PREFIX = "/app/.global"' "$PLATFORM_APP"
+
+# --- .nvmrc (read by `n auto` in the build hook) -----------------------------
+# Override the default with: NODE_VERSION=24 ./upgrade-php84.sh
+NODE_VERSION="${NODE_VERSION:-26}"
+if [[ -f .nvmrc ]]; then
+  echo "==> .nvmrc already exists ($(tr -d '[:space:]' < .nvmrc)); leaving it alone"
+else
+  echo "==> Creating .nvmrc with Node $NODE_VERSION"
+  echo "$NODE_VERSION" > .nvmrc
+fi
+
+# --- 6. Build hook -----------------------------------------------------------
+BUILD_HOOK='# Install the version from .nvmrc
+n auto
+# Recognize the newly installed version
+hash -r
+'
+
+if [[ "$(yq '.hooks | has("build")' "$PLATFORM_APP")" == "true" ]]; then
+  echo "==> A build hook already exists in $PLATFORM_APP."
+  echo "    It has to be updated manually. Add the following to hooks.build:"
+  echo
+  echo "      # Install the version from .nvmrc"
+  echo "      n auto"
+  echo "      # Recognize the newly installed version"
+  echo "      hash -r"
+  echo
+else
+  echo "==> No build hook found; creating one"
+  export BUILD_HOOK
+  if [[ "$(yq '.hooks | has("deploy")' "$PLATFORM_APP")" == "true" ]]; then
+    # Rebuild the hooks map so that build sits directly after deploy.
+    yq -i '
+      .hooks = ({"deploy": .hooks.deploy, "build": strenv(BUILD_HOOK)} + .hooks)
+      | .hooks.build style = "literal"
+    ' "$PLATFORM_APP"
+  else
+    # No deploy hook to anchor to; just add build under hooks.
+    yq -i '
+      .hooks.build = strenv(BUILD_HOOK)
+      | .hooks.build style = "literal"
+    ' "$PLATFORM_APP"
+  fi
+fi
+
+echo
+echo "Done. Review the changes with: git diff"
+echo "Remember to run 'ddev restart' so DDEV picks up PHP 8.4."
