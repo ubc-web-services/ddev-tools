@@ -6,5 +6,6 @@ project_files:
   - commands/web/php-up
   - commands/web/robots
   - commands/web/theme
+  - commands/web/unsetfont
 
 ddev_version_constraint: '>= v1.24.10'
