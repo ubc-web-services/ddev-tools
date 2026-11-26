@@ -9,7 +9,7 @@ on:
       - "**.md"
 
   schedule:
-    - cron: '25 08 * * *'
+    - cron: '0 15 * * 2,4'
 
   workflow_dispatch:
     inputs:
