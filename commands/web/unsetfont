@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+#ddev-generated
+
+## Description: Unset the default theme's clf_fonts variable
+## Usage: unsetfont
+## Example: ddev unsetfont
+
+# find the current default theme
+THEME=$(drush config:get system.theme default --format=string)
+# Unset the default theme clf_fonts variable
+drush config-set "$THEME".settings clf_fonts "" -y
